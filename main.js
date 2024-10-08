@@ -27,36 +27,33 @@ const server = http.createServer(async (req, res) => {
         await page.goto(`https://roadmap.sh/${roadmap}`, { waitUntil: 'networkidle' });
 
         const topics = await page.$$('[data-type="topic"]');
-
-        let topicContents = [];
-
-        let i = 0;
-        console.log('Fetching topics...');
-        for (const topic of topics) {
-            const title = await topic.getAttribute('data-title');
-            await topic.click();
-            await page.waitForSelector('#topic-content');
-            const content = await page.$eval('#topic-content p', el => el.textContent);
-            topicContents.push({ title, content });
-            await page.click('id=close-topic');
-            console.log(`${++i}/${topics.length} (${title})`);
-        }
-
         const subtopics = await page.$$('[data-type="subtopic"]');
 
-        let subtopicContents = [];
-
-        i = 0;
-        console.log('Fetching subtopics...');
-        for (const topic of subtopics) {
-            const title = await topic.getAttribute('data-title');
-            await topic.click();
-            await page.waitForSelector('#topic-content');
-            const content = await page.$eval('#topic-content p', el => el.textContent);
-            subtopicContents.push({ title, content });
-            await page.click('id=close-topic');
-            console.log(`${++i}/${subtopics.length} (${title})`);
-        }
+        const topicContents = await Promise.all(
+            topics.map(async topic => {
+                const title = await topic.getAttribute('data-title');
+                const node = await topic.getAttribute('data-node-id');
+                const url = `https://roadmap.sh/${roadmap}/${title.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')}@${node}`;
+                return fetch(url)
+                    .then(res => res.text())
+                    .then(html => {
+                        return { title, content: html.match(/<p>(.*?)<\/p>/)[0] };
+                    });
+                })
+        );
+        
+        const subtopicContents = await Promise.all(
+            subtopics.map(async subtopic => {
+                const title = await subtopic.getAttribute('data-title');
+                const node = await subtopic.getAttribute('data-node-id');
+                const url = `https://roadmap.sh/${roadmap}/${title.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')}@${node}`;
+                return fetch(url)
+                    .then(res => res.text())
+                    .then(html => {
+                        return { title, content: html.match(/<p>(.*?)<\/p>/)[0] };
+                    });
+                })
+        );
 
         await browser.close();
 

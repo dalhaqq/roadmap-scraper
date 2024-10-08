@@ -1,2 +1,9 @@
+[phase.build]
+cmds = [
+    'npm install',
+    'npx playwright install-deps',
+    'npx playwright install chromium',
+]
+
 [start]
 cmd = 'node main.js'

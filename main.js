@@ -21,7 +21,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (pathname === '/scrape') {
         const roadmap = query.roadmap;
-        const browser = await chromium.launch({ headless: false });
+        const browser = await chromium.launch({ headless: true });
         const page = await browser.newPage();
 
         await page.goto(`https://roadmap.sh/${roadmap}`, { waitUntil: 'networkidle' });

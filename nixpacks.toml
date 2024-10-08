@@ -1,4 +1,4 @@
-[phase.build]
+[phases.build]
 cmds = [
     'npm install',
     'npx playwright install-deps',

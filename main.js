@@ -1,6 +1,7 @@
 const http = require('http');
 const url = require('url');
 const fs = require('fs');
+const axios = require('axios');
 
 const { chromium } = require('playwright');
 
@@ -33,26 +34,28 @@ const server = http.createServer(async (req, res) => {
             topics.map(async topic => {
                 const title = await topic.getAttribute('data-title');
                 const node = await topic.getAttribute('data-node-id');
-                const url = `https://roadmap.sh/${roadmap}/${title.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')}@${node}`;
-                return fetch(url)
-                    .then(res => res.text())
-                    .then(html => {
-                        return { title, content: html.match(/<p>(.*?)<\/p>/)[0] };
+                const url = `https://roadmap.sh/${roadmap}/${title.toLowerCase().replace(/[^a-z0-9\s\-]/g, '').replace(/\s/g, '-')}@${node}`;
+                return axios.get(url)
+                    .then(res => {
+                        const content = res.data.match(/<p>(.*?)<\/p>/)[0];
+                        return { title, content };
                     });
-                })
+                }
+            )
         );
         
         const subtopicContents = await Promise.all(
             subtopics.map(async subtopic => {
                 const title = await subtopic.getAttribute('data-title');
                 const node = await subtopic.getAttribute('data-node-id');
-                const url = `https://roadmap.sh/${roadmap}/${title.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')}@${node}`;
-                return fetch(url)
-                    .then(res => res.text())
-                    .then(html => {
-                        return { title, content: html.match(/<p>(.*?)<\/p>/)[0] };
+                const url = `https://roadmap.sh/${roadmap}/${title.toLowerCase().replace(/[^a-z0-9\s\-]/g, '').replace(/\s/g, '-')}@${node}`;
+                return axios.get(url)
+                    .then(res => {
+                        const content = res.data.match(/<p>(.*?)<\/p>/)[0];
+                        return { title, content };
                     });
-                })
+                }
+            )
         );
 
         await browser.close();

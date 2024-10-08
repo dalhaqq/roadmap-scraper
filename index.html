@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drag and Drop Topics and Subtopics</title>
+    <style>
+        button.save {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin: 10px;
+        }
+
+        main {
+            display: flex; /* Use Flexbox to align topics and subtopics */
+            justify-content: space-between;
+            /* margin: 20px; */
+        }
+        
+        .topic, .subtopic {
+            margin: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background-color: #f9f9f9;
+            cursor: move;
+            min-width: 420px;
+        }
+
+        .group {
+            margin-bottom: 20px;
+        }
+
+        .topic-list, .subtopic-list {
+            width: 580px;
+            border: 2px dashed #ccc;
+            padding: 10px;
+            min-height: 50px;
+            background-color: #fff;
+        }
+
+        .subtopic-container {
+            margin-top: 10px;
+            /* padding-left: 20px; */
+            border-left: 2px solid #ccc;
+        }
+
+        .subtopic-container.hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+<div>
+    <input type="text" name="roadmap">
+    <button onclick="get()">Get</button>
+    <button onclick="save()">Save</button>
+</div>
+<main>
+    <div id="topic-list" class="topic-list group">
+        <h2>Topics</h2>
+        <!-- Topics will be dynamically inserted here -->
+    </div>
+    
+    <div id="subtopic-list" class="subtopic-list group">
+        <h2>Subtopics</h2>
+        <!-- Subtopics will be dynamically inserted here -->
+    </div>
+</main>
+
+<!-- Include Sortable.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
+
+<script>
+    let topicContents = [];
+    let subtopicContents = [];
+
+    function toggleSubtopics(button) {
+        const topic = button.parentElement;
+        const subtopicContainer = topic.querySelector('.subtopic-container');
+        subtopicContainer.classList.toggle('hidden');
+        button.textContent = subtopicContainer.classList.contains('hidden') ? 'Show' : 'Hide';
+    }
+
+    function get() {
+        topicContents = [];
+        subtopicContents = [];
+
+        const endpoint = document.querySelector('input[name="roadmap"]').value;
+        fetch(`/scrape?roadmap=${endpoint}`)
+            .then(response => response.json())
+            .then(data => {
+                topicContents = data.topicContents.map((topic, index) => {
+                    return {
+                        id: index + 1,
+                        title: topic.title,
+                        content: topic.content
+                    };
+                });
+
+                subtopicContents = data.subtopicContents.map((subtopic, index) => {
+                    return {
+                        id: index + 1,
+                        title: subtopic.title,
+                        content: subtopic.content
+                    };
+                });
+
+                const topicList = document.getElementById('topic-list');
+                const subtopicList = document.getElementById('subtopic-list');
+
+                // Helper function to create a topic HTML element
+                function createTopicElement(topic) {
+                    const div = document.createElement('div');
+                    div.classList.add('topic');
+                    div.dataset.index = topic.id; // Store the index for later use
+                    div.innerHTML = `
+                    <strong>${topic.title}</strong>
+                    <button onclick="toggleSubtopics(this)">Hide</button>
+                    `;
+                    
+                    const subtopicContainer = document.createElement('div');
+                    subtopicContainer.classList.add('subtopic-container');
+                    div.appendChild(subtopicContainer);
+
+                    // Make the subtopic container sortable (allowing subtopics to be dropped into it)
+                    new Sortable(subtopicContainer, {
+                        group: 'subtopics',
+                        animation: 150,
+                    });
+
+                    return div;
+                }
+
+                // Insert topics into the topic list
+                topicList.innerHTML = '';
+                topicContents.forEach((topic) => {
+                    const topicElement = createTopicElement(topic);
+                    topicList.appendChild(topicElement);
+                });
+
+                // Insert subtopics into the subtopic list
+                subtopicList.innerHTML = '';
+                subtopicContents.forEach((subtopic) => {
+                    const div = document.createElement('div');
+                    div.classList.add('subtopic');
+                    div.dataset.index = subtopic.id; // Store the index for later use
+                    div.innerHTML = `<strong>${subtopic.title}</strong>`;
+                    subtopicList.appendChild(div);
+                });
+
+                // Make topics draggable
+                new Sortable(topicList, {
+                    group: 'topics',
+                    animation: 150,
+                    ghostClass: 'sortable-ghost'
+                });
+
+                // Make subtopics draggable and only allow them to be dragged into topics
+                new Sortable(subtopicList, {
+                    group: 'subtopics',
+                    animation: 150,
+                    ghostClass: 'sortable-ghost',
+                });
+            });
+    }
+
+    function save() {
+        const topics = Array.from(document.querySelectorAll('.topic'));
+        const subtopics = Array.from(document.querySelectorAll('.subtopic'));
+
+        let topicData = topics.map(topic => {
+            const subtopicContainer = topic.querySelector('.subtopic-container');
+            const subtopics = Array.from(subtopicContainer.children).map(subtopic => {
+                return subtopicContents.find(subtopicContent => subtopicContent.id == subtopic.dataset.index);
+            });
+
+            return {
+                ...(topicContents.find(topicContent => topicContent.id == topic.dataset.index)),
+                subtopics
+            };
+        });
+
+        topicData = topicData.map(topic => {
+            return {
+                title: topic.title,
+                content: topic.content,
+                subtopics: topic.subtopics.map(subtopic => {
+                    return {
+                        title: subtopic.title,
+                        content: subtopic.content
+                    };
+                })
+            };
+        });
+        
+        const topicDataString = JSON.stringify(topicData, null, 2);
+
+        // save to file
+        const blob = new Blob([topicDataString], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'frontend-topics.json';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+</script>
+
+</body>
+</html>
